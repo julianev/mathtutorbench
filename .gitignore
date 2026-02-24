@@ -1,0 +1,28 @@
+# SLURM logs
+logs/
+
+# Benchmark results
+results/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Environment / secrets
+.env
+.env.*
+
+# Cluster config (contains site-specific SLURM settings)
+slurm/cluster_config.sh
+
+# OS
+.DS_Store
+
+PLAN.md
+CLAUDE.md

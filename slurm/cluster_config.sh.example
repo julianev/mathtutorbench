@@ -1,0 +1,7 @@
+# Cluster-specific SLURM configuration.
+# Copy this file to cluster_config.sh and edit for your cluster.
+#
+#   cp slurm/cluster_config.sh.example slurm/cluster_config.sh
+
+PARTITION="gpu"
+EXCLUDE=""

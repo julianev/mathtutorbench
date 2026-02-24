@@ -1,0 +1,31 @@
+[project]
+name = "mathtutorbench"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "datasets==3.1.0",
+    "google-generativeai==0.8.3",
+    "jinja2==3.1.5",
+    "matplotlib==3.10.0",
+    "openai>=1.59.6",
+    "opencv-python-headless==4.12.0.88",
+    "sacrebleu==2.5.1",
+    "scikit-learn==1.6.1",
+    "tenacity==9.0.0",
+    "torch==2.8.0",
+    "tqdm==4.67.1",
+    "transformers>=4.55.2,<5",
+    "vllm==0.10.2",
+]
+
+[tool.uv]
+environments = ["sys_platform == 'linux'"]
+
+[[tool.uv.index]]
+name = "pypi"
+url = "https://pypi.org/simple"
+
+[tool.uv.sources]
+vllm = { index = "pypi" }

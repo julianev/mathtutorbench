@@ -32,7 +32,7 @@ def parse_model_args(args_str: str) -> Dict[str, Any]:
 
 
 def load_task_config(config_path: str) -> TaskConfig:
-    with open("configs/" + config_path, 'r') as f:
+    with open(Path(__file__).parent / "configs" / config_path, 'r') as f:
         config_dict = yaml.safe_load(f)
     return TaskConfig(**config_dict)
 

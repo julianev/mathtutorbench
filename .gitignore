@@ -4,6 +4,9 @@ logs/
 # Benchmark results
 results/
 
+# Optimization results
+optimize/results/
+
 # Python
 __pycache__/
 *.pyc
@@ -20,6 +23,9 @@ __pycache__/
 
 # Cluster config (contains site-specific SLURM settings)
 slurm/cluster_config.sh
+
+# Temp files
+.tmp/
 
 # OS
 .DS_Store

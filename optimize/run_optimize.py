@@ -45,6 +45,36 @@ def load_dspy_examples(data_path: str) -> list[dspy.Example]:
     return examples
 
 
+def diagnose_outputs(program: dspy.Module, examples: list[dspy.Example], n: int = 3):
+    """Run a few examples and print full predictions to diagnose truncation."""
+    print(f"\n{'='*60}")
+    print(f"DIAGNOSTIC: Running {n} examples to inspect raw outputs")
+    print(f"{'='*60}")
+    for i, ex in enumerate(examples[:n]):
+        pred = program(
+            problem=ex.problem,
+            reference_solution=ex.reference_solution,
+            dialog_history=ex.dialog_history,
+        )
+        reasoning = getattr(pred, "reasoning", "")
+        utterance = getattr(pred, "teacher_utterance", "")
+        reasoning_tokens = len(reasoning) // 4  # rough estimate
+        utterance_tokens = len(utterance) // 4
+        total_chars = len(reasoning) + len(utterance)
+        total_tokens_est = total_chars // 4
+
+        print(f"\n--- Example {i+1} ---")
+        print(f"Problem: {ex.problem[:100]}...")
+        print(f"Reasoning ({reasoning_tokens}~tok, {len(reasoning)} chars):")
+        print(f"  {reasoning[:500]}{'...[TRUNCATED]' if len(reasoning) > 500 else ''}")
+        print(f"Teacher utterance ({utterance_tokens}~tok, {len(utterance)} chars):")
+        print(f"  {utterance}")
+        print(f"Total output: ~{total_tokens_est} tokens ({total_chars} chars)")
+        if not utterance:
+            print("  *** WARNING: teacher_utterance is EMPTY — likely truncated before reaching this field ***")
+    print(f"{'='*60}\n")
+
+
 def evaluate_program(program: dspy.Module, examples: list[dspy.Example]) -> float:
     scores = []
     for ex in examples:
@@ -180,8 +210,11 @@ def main():
     test = examples[args.train_size + args.dev_size : args.train_size + args.dev_size + args.test_size]
     print(f"Train: {len(train)}, Dev: {len(dev)}, Test: {len(test)}")
 
-    # Baseline scores (train included for overfitting diagnosis)
+    # Diagnostic: inspect a few raw outputs before committing to full evaluation
     baseline_program = ScaffoldingModule()
+    diagnose_outputs(baseline_program, train, n=3)
+
+    # Baseline scores (train included for overfitting diagnosis)
     print("Computing baseline score on train set ...")
     baseline_train_score = evaluate_program(baseline_program, train)
     print(f"Baseline train score: {baseline_train_score:.4f}")

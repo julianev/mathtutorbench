@@ -1,11 +1,12 @@
 #!/bin/bash
-# Wrapper script to submit a prompt optimization SLURM job with nice CLI args.
+# Wrapper script to submit a MIPROv2 prompt optimization SLURM job with nice CLI args.
 # Run from the login node.
 #
 # Usage:
-#   bash optimize/run_optimize.sh --model Qwen/Qwen2.5-1.5B-Instruct
-#   bash optimize/run_optimize.sh --model Qwen/Qwen2.5-7B-Instruct --optimizer bootstrap_rs
-#   bash optimize/run_optimize.sh --model Qwen/Qwen2.5-1.5B-Instruct --train_size 50 --dev_size 20 --trials 10  # pilot
+#   bash optimize/run_optimize.sh --model Qwen/Qwen3-4B
+#   bash optimize/run_optimize.sh --model Qwen/Qwen3-4B \
+#       --prompt_model mistralai/Mistral-7B-Instruct-v0.3 --auto medium
+#   bash optimize/run_optimize.sh --model Qwen/Qwen3-4B --train_size 50 --dev_size 20  # pilot
 
 set -euo pipefail
 
@@ -26,58 +27,79 @@ SBATCH_CLUSTER_ARGS=()
 [ -n "${EXCLUDE:-}" ]   && SBATCH_CLUSTER_ARGS+=(--exclude="$EXCLUDE")
 
 # --- Defaults ---
-MODEL_NAME="Qwen/Qwen2.5-1.5B-Instruct"
-OPTIMIZER="mipro"
-TRAIN_SIZE=200
-DEV_SIZE=100
-TRIALS=20
+# Leave split sizes empty so the Python script applies the --mode preset.
+MODEL_NAME="Qwen/Qwen3-4B"
+MODE="paper"
+TRAIN_SIZE=""
+DEV_SIZE=""
+TEST_SIZE=""
 AUTO="light"
-GPU_COUNT=1
+MAX_TOKENS=2048
+PROMPT_MODEL_NAME=""
+PROMPT_MAX_TOKENS=4096
+GPU_COUNT=""
 
 # --- Parse arguments ---
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --model)        MODEL_NAME="$2";  shift 2 ;;
-        --optimizer)    OPTIMIZER="$2";    shift 2 ;;
-        --train_size)   TRAIN_SIZE="$2";   shift 2 ;;
-        --dev_size)     DEV_SIZE="$2";     shift 2 ;;
-        --trials)       TRIALS="$2";       shift 2 ;;
-        --auto)         AUTO="$2";         shift 2 ;;
-        --gpus)         GPU_COUNT="$2";    shift 2 ;;
+        --model)              MODEL_NAME="$2";         shift 2 ;;
+        --mode)               MODE="$2";               shift 2 ;;
+        --train_size)         TRAIN_SIZE="$2";         shift 2 ;;
+        --dev_size)            DEV_SIZE="$2";          shift 2 ;;
+        --test_size)          TEST_SIZE="$2";          shift 2 ;;
+        --auto)               AUTO="$2";               shift 2 ;;
+        --max_tokens)         MAX_TOKENS="$2";         shift 2 ;;
+        --prompt_model)       PROMPT_MODEL_NAME="$2";  shift 2 ;;
+        --prompt_max_tokens)  PROMPT_MAX_TOKENS="$2";  shift 2 ;;
+        --gpus)               GPU_COUNT="$2";          shift 2 ;;
         *)
             echo "Unknown argument: $1"
             echo ""
             echo "Usage: bash optimize/run_optimize.sh [OPTIONS]"
             echo ""
             echo "Options:"
-            echo "  --model MODEL        Model name (default: Qwen/Qwen2.5-1.5B-Instruct)"
-            echo "  --optimizer OPT      mipro|bootstrap|bootstrap_rs (default: mipro)"
-            echo "  --train_size N       Training examples (default: 200)"
-            echo "  --dev_size N         Dev examples (default: 100)"
-            echo "  --trials N           Optimization trials (default: 20)"
-            echo "  --auto LEVEL         MIPROv2 auto setting: light|medium|heavy (default: light)"
-            echo "  --gpus N             GPU count (default: 2, one for vllm + one for reward model)"
+            echo "  --model MODEL             Task model (default: Qwen/Qwen3-4B)"
+            echo "  --mode MODE               Split preset: paper|dspy (default: paper)"
+            echo "  --train_size N            Override preset: training examples"
+            echo "  --dev_size N              Override preset: dev examples"
+            echo "  --test_size N             Override preset: held-out test examples"
+            echo "  --auto LEVEL              MIPROv2 auto setting: light|medium|heavy (default: light)"
+            echo "  --max_tokens N            Task LM completion budget (default: 2048)"
+            echo "  --prompt_model MODEL      Stronger model for MIPROv2 instruction proposal"
+            echo "                            (served as a second vllm on GPU 1; optional)"
+            echo "  --prompt_max_tokens N     Prompt proposer completion budget (default: 4096)"
+            echo "  --gpus N                  GPU count (default: 1, or 2 when --prompt_model is set)"
             exit 1
             ;;
     esac
 done
+
+# --- Auto-bump GPU count when a separate prompt model is requested ---
+if [ -z "$GPU_COUNT" ]; then
+    if [ -n "$PROMPT_MODEL_NAME" ]; then
+        GPU_COUNT=2
+    else
+        GPU_COUNT=1
+    fi
+fi
 
 # --- Create log directory ---
 mkdir -p logs
 
 # --- Print configuration ---
 echo "=== Prompt Optimization ==="
-echo "Model:     $MODEL_NAME"
-echo "Optimizer: $OPTIMIZER"
-echo "Train/Dev: $TRAIN_SIZE / $DEV_SIZE"
-echo "Trials:    $TRIALS"
-echo "Auto:      $AUTO"
-echo "GPUs:      $GPU_COUNT"
+echo "Model:          $MODEL_NAME"
+echo "Prompt model:   ${PROMPT_MODEL_NAME:-(same as task model)}"
+echo "Mode:           $MODE"
+echo "Train/Dev/Test: ${TRAIN_SIZE:-(preset)} / ${DEV_SIZE:-(preset)} / ${TEST_SIZE:-(preset)}"
+echo "Auto:           $AUTO"
+echo "Max tokens:     $MAX_TOKENS"
+echo "GPUs:           $GPU_COUNT"
 echo "==========================="
 echo ""
 
 # --- Submit job ---
-export MODEL_NAME OPTIMIZER TRAIN_SIZE DEV_SIZE TRIALS AUTO
+export MODEL_NAME MODE TRAIN_SIZE DEV_SIZE TEST_SIZE AUTO MAX_TOKENS PROMPT_MODEL_NAME PROMPT_MAX_TOKENS
 
 JOB_ID=$(sbatch --parsable \
     "${SBATCH_CLUSTER_ARGS[@]}" \

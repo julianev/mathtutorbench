@@ -31,6 +31,7 @@ OPTIMIZER="mipro"
 TRAIN_SIZE=200
 DEV_SIZE=100
 TRIALS=20
+AUTO="light"
 GPU_COUNT=1
 
 # --- Parse arguments ---
@@ -41,6 +42,7 @@ while [[ $# -gt 0 ]]; do
         --train_size)   TRAIN_SIZE="$2";   shift 2 ;;
         --dev_size)     DEV_SIZE="$2";     shift 2 ;;
         --trials)       TRIALS="$2";       shift 2 ;;
+        --auto)         AUTO="$2";         shift 2 ;;
         --gpus)         GPU_COUNT="$2";    shift 2 ;;
         *)
             echo "Unknown argument: $1"
@@ -53,6 +55,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --train_size N       Training examples (default: 200)"
             echo "  --dev_size N         Dev examples (default: 100)"
             echo "  --trials N           Optimization trials (default: 20)"
+            echo "  --auto LEVEL         MIPROv2 auto setting: light|medium|heavy (default: light)"
             echo "  --gpus N             GPU count (default: 2, one for vllm + one for reward model)"
             exit 1
             ;;
@@ -68,12 +71,13 @@ echo "Model:     $MODEL_NAME"
 echo "Optimizer: $OPTIMIZER"
 echo "Train/Dev: $TRAIN_SIZE / $DEV_SIZE"
 echo "Trials:    $TRIALS"
+echo "Auto:      $AUTO"
 echo "GPUs:      $GPU_COUNT"
 echo "==========================="
 echo ""
 
 # --- Submit job ---
-export MODEL_NAME OPTIMIZER TRAIN_SIZE DEV_SIZE TRIALS
+export MODEL_NAME OPTIMIZER TRAIN_SIZE DEV_SIZE TRIALS AUTO
 
 JOB_ID=$(sbatch --parsable \
     "${SBATCH_CLUSTER_ARGS[@]}" \

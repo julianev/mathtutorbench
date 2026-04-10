@@ -19,6 +19,7 @@ OPTIMIZER="${OPTIMIZER:-mipro}"
 TRAIN_SIZE="${TRAIN_SIZE:-200}"
 DEV_SIZE="${DEV_SIZE:-100}"
 TRIALS="${TRIALS:-20}"
+AUTO="${AUTO:-light}"
 
 VLLM_PORT="${VLLM_PORT:-8000}"
 TENSOR_PARALLEL_SIZE="${TENSOR_PARALLEL_SIZE:-1}"
@@ -111,6 +112,7 @@ OPTIMIZE_ARGS=(
     --train_size "$TRAIN_SIZE"
     --dev_size "$DEV_SIZE"
     --trials "$TRIALS"
+    --auto "$AUTO"
     --data_path "$DATA_PATH"
 )
 [ -n "$OUTPUT" ] && OPTIMIZE_ARGS+=(--output "$OUTPUT")

@@ -82,6 +82,12 @@ def main():
         default="mipro",
         help="DSPy optimizer: mipro (MIPROv2), bootstrap (BootstrapFewShot), bootstrap_rs (BootstrapFewShotWithRandomSearch)",
     )
+    parser.add_argument(
+        "--auto",
+        choices=["light", "medium", "heavy"],
+        default="light",
+        help="MIPROv2 auto setting controlling trial count (default: light)",
+    )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument(
         "--data_path",
@@ -133,7 +139,7 @@ def main():
     if args.optimizer == "mipro":
         optimizer = dspy.MIPROv2(
             metric=reward_metric,
-            auto="light",
+            auto=args.auto,
         )
     elif args.optimizer == "bootstrap":
         optimizer = dspy.BootstrapFewShot(
@@ -171,16 +177,16 @@ def main():
     optimized_program.save(str(output_path))
     print(f"Saved optimized program to {output_path}")
 
-    # Save summary
+    # Save summary with all args for reproducibility
     summary = {
         "model": args.model,
         "optimizer": args.optimizer,
-        "train_size": len(train),
-        "dev_size": len(dev),
-        "trials": args.trials,
         "baseline_score": baseline_score,
         "optimized_score": optimized_score,
         "improvement": optimized_score - baseline_score,
+        "args": vars(args),
+        "train_size_actual": len(train),
+        "dev_size_actual": len(dev),
     }
     summary_path = output_path.with_suffix(".summary.json")
     with open(summary_path, "w") as f:

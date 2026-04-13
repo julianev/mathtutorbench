@@ -16,6 +16,7 @@ Usage:
 import argparse
 import json
 import random
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -28,6 +29,22 @@ import dspy
 from dataloaders.mathbridge import MathBridge
 from optimize.metric import reward_metric
 from optimize.module import ScaffoldingModule
+
+
+def clean_instruction(text: str) -> str:
+    """Strip proposer-template leakage from a proposed instruction.
+
+    Small instruct-tuned proposers (Mistral, Llama) sometimes emit stray chat-template
+    tokens or bracket fragments at the boundary of their output — e.g. a leading "]"
+    from Mistral's [INST]...[/INST] framing. These are cosmetic but confusing when
+    reading the saved program, and harmless to strip.
+    """
+    text = text.strip()
+    # Strip common chat-template tokens (Mistral [INST], Llama <|...|>, ChatML, etc.)
+    text = re.sub(r"^(\[/?INST\]|<\|[^|]+\|>|<s>|</s>)\s*", "", text)
+    # Strip stray leading bracket/brace/paren fragments left over from template scaffolding.
+    text = re.sub(r"^[\]\}\)]+\s*", "", text)
+    return text.strip()
 
 
 def load_dspy_examples(data_path: str) -> list[dspy.Example]:
@@ -161,6 +178,8 @@ def main():
     random.seed(args.seed)
 
     # Configure DSPy LM (OpenAI-compatible endpoint)
+    # Qwen3 has a native <think> mode that conflicts with DSPy's ChainOfThought —
+    # disable it so only DSPy's structured reasoning field is used.
     lm = dspy.LM(
         f"openai/{args.model}",
         api_base=args.base_url,
@@ -172,6 +191,7 @@ def main():
         # "\n\n" is deliberately NOT included — it would cut DSPy's structured output
         # format between the reasoning and teacher_utterance fields.
         stop=["Student:", "Teacher:"],
+        extra_body={"chat_template_kwargs": {"enable_thinking": False}},
     )
     dspy.configure(lm=lm)
 
@@ -214,6 +234,16 @@ def main():
     baseline_program = ScaffoldingModule()
     diagnose_outputs(baseline_program, train, n=3)
 
+    # Capture the initial instruction(s) so the summary records the starting point.
+    # Useful when experimenting with different ScaffoldingSignature docstrings.
+    initial_instructions = {
+        name: pred.signature.instructions
+        for name, pred in baseline_program.named_predictors()
+    }
+    print("Initial instruction(s):")
+    for name, instr in initial_instructions.items():
+        print(f"  [{name}] {instr}")
+
     # Baseline scores (train included for overfitting diagnosis)
     print("Computing baseline score on train set ...")
     baseline_train_score = evaluate_program(baseline_program, train)
@@ -231,8 +261,27 @@ def main():
         mipro_kwargs["prompt_model"] = prompt_lm
     optimizer = dspy.MIPROv2(**mipro_kwargs)
 
+    # Resolve what `auto` expands to (number of candidate instructions, val_size, etc.)
+    # so the summary records the effective optimizer budget, not just the preset name.
+    from dspy.teleprompt.mipro_optimizer_v2 import AUTO_RUN_SETTINGS
+    auto_settings = dict(AUTO_RUN_SETTINGS.get(args.auto, {}))
+    print(f"MIPROv2 auto='{args.auto}' resolves to: {auto_settings}")
+
     print(f"Running MIPROv2 (auto='{args.auto}') ...")
     optimized_program = optimizer.compile(ScaffoldingModule(), trainset=train, valset=dev)
+
+    # Clean proposer-template leakage (e.g. stray leading "]" from Mistral's [INST] framing)
+    # from the optimized instruction(s) before evaluation and save.
+    optimized_instructions = {}
+    for name, pred in optimized_program.named_predictors():
+        original = pred.signature.instructions
+        cleaned = clean_instruction(original)
+        if cleaned != original:
+            print(f"Cleaned proposer artifacts from [{name}] instruction:")
+            print(f"  Before: {original[:120]!r}{'...' if len(original) > 120 else ''}")
+            print(f"  After:  {cleaned[:120]!r}{'...' if len(cleaned) > 120 else ''}")
+            pred.signature = pred.signature.with_instructions(cleaned)
+        optimized_instructions[name] = cleaned
 
     # Evaluate optimized program on train, dev, and held-out test
     print("Computing optimized score on train set ...")
@@ -255,6 +304,9 @@ def main():
     summary = {
         "model": args.model,
         "optimizer": "mipro",
+        "auto": args.auto,
+        "auto_settings": auto_settings,
+        "prompt_model": args.prompt_model,
         "baseline_train_score": baseline_train_score,
         "baseline_dev_score": baseline_dev_score,
         "baseline_test_score": baseline_test_score,
@@ -268,6 +320,8 @@ def main():
         "train_size_actual": len(train),
         "dev_size_actual": len(dev),
         "test_size_actual": len(test),
+        "initial_instructions": initial_instructions,
+        "optimized_instructions": optimized_instructions,
     }
     summary_path = output_path.with_suffix(".summary.json")
     with open(summary_path, "w") as f:

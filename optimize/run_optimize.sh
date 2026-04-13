@@ -37,6 +37,7 @@ AUTO="light"
 MAX_TOKENS=2048
 PROMPT_MODEL_NAME=""
 PROMPT_MAX_TOKENS=4096
+PROMPT_MAX_MODEL_LEN=""
 GPU_COUNT=""
 
 # --- Parse arguments ---
@@ -49,9 +50,10 @@ while [[ $# -gt 0 ]]; do
         --test_size)          TEST_SIZE="$2";          shift 2 ;;
         --auto)               AUTO="$2";               shift 2 ;;
         --max_tokens)         MAX_TOKENS="$2";         shift 2 ;;
-        --prompt_model)       PROMPT_MODEL_NAME="$2";  shift 2 ;;
-        --prompt_max_tokens)  PROMPT_MAX_TOKENS="$2";  shift 2 ;;
-        --gpus)               GPU_COUNT="$2";          shift 2 ;;
+        --prompt_model)          PROMPT_MODEL_NAME="$2";    shift 2 ;;
+        --prompt_max_tokens)     PROMPT_MAX_TOKENS="$2";    shift 2 ;;
+        --prompt_max_model_len)  PROMPT_MAX_MODEL_LEN="$2"; shift 2 ;;
+        --gpus)                  GPU_COUNT="$2";            shift 2 ;;
         *)
             echo "Unknown argument: $1"
             echo ""
@@ -68,6 +70,9 @@ while [[ $# -gt 0 ]]; do
             echo "  --prompt_model MODEL      Stronger model for MIPROv2 instruction proposal"
             echo "                            (served as a second vllm on GPU 1; optional)"
             echo "  --prompt_max_tokens N     Prompt proposer completion budget (default: 4096)"
+            echo "  --prompt_max_model_len N  Prompt proposer vllm --max-model-len (default: 32768)"
+            echo "                            Lower this (e.g. 16384) for larger proposers (~32B) to leave"
+            echo "                            KV-cache headroom on a single 80GB H100."
             echo "  --gpus N                  GPU count (default: 1, or 2 when --prompt_model is set)"
             exit 1
             ;;
@@ -94,12 +99,13 @@ echo "Mode:           $MODE"
 echo "Train/Dev/Test: ${TRAIN_SIZE:-(preset)} / ${DEV_SIZE:-(preset)} / ${TEST_SIZE:-(preset)}"
 echo "Auto:           $AUTO"
 echo "Max tokens:     $MAX_TOKENS"
+echo "Prompt max-model-len: ${PROMPT_MAX_MODEL_LEN:-(default 32768)}"
 echo "GPUs:           $GPU_COUNT"
 echo "==========================="
 echo ""
 
 # --- Submit job ---
-export MODEL_NAME MODE TRAIN_SIZE DEV_SIZE TEST_SIZE AUTO MAX_TOKENS PROMPT_MODEL_NAME PROMPT_MAX_TOKENS
+export MODEL_NAME MODE TRAIN_SIZE DEV_SIZE TEST_SIZE AUTO MAX_TOKENS PROMPT_MODEL_NAME PROMPT_MAX_TOKENS PROMPT_MAX_MODEL_LEN
 
 JOB_ID=$(sbatch --parsable \
     "${SBATCH_CLUSTER_ARGS[@]}" \

@@ -47,11 +47,11 @@ echo "Installing core benchmark dependencies..."
 uv sync
 
 # --- Install PyTorch
-uv add "torch==2.8.0"
+uv add "torch>=2.10.0"
 
 # --- Install vLLM
-uv add "opencv-python-headless==4.12.0.88"
-uv add --index pypi=https://pypi.org/simple vllm==0.10.2 --extra-index-url https://wheels.vllm.ai/0.10.2/
+uv add "opencv-python-headless>=4.13.0"
+uv add --index pypi=https://pypi.org/simple vllm==0.19.0 --extra-index-url https://wheels.vllm.ai/0.19.0/
 
 # --- Verify installation ---
 echo "Verifying installation..."

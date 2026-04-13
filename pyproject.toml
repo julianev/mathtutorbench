@@ -12,14 +12,14 @@ dependencies = [
     "jinja2==3.1.5",
     "matplotlib==3.10.0",
     "openai>=1.59.6",
-    "opencv-python-headless==4.12.0.88",
+    "opencv-python-headless>=4.13.0",
     "sacrebleu==2.5.1",
     "scikit-learn==1.6.1",
     "tenacity==9.0.0",
-    "torch==2.8.0",
+    "torch>=2.10.0",
     "tqdm==4.67.1",
     "transformers>=4.55.2,<5",
-    "vllm==0.10.2",
+    "vllm>=0.19.0",
     "accelerate>=1.13.0",
 ]
 

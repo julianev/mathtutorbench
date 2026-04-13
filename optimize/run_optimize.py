@@ -32,17 +32,40 @@ from optimize.module import ScaffoldingModule
 
 
 def clean_instruction(text: str) -> str:
-    """Strip proposer-template leakage from a proposed instruction.
+    """Strip proposer-template and reasoning-mode leakage from a proposed instruction.
 
-    Small instruct-tuned proposers (Mistral, Llama) sometimes emit stray chat-template
-    tokens or bracket fragments at the boundary of their output — e.g. a leading "]"
-    from Mistral's [INST]...[/INST] framing. These are cosmetic but confusing when
-    reading the saved program, and harmless to strip.
+    Reasoning proposers (Ministral-3-Reasoning, Gemma-4 w/ thinking, Qwen3.5 27B+)
+    emit internal chain-of-thought before their final answer. If those tokens leak
+    into what DSPy captures as the proposed instruction, the saved prompt becomes
+    garbled. Small instruct-tuned proposers (Mistral, Llama) also occasionally emit
+    stray chat-template tokens at the boundary of their output.
+
+    Stripped patterns (in order):
+      1. `<think>...</think>` blocks (Qwen3/Qwen3.5, DeepSeek-R1, Ministral-Reasoning)
+      2. `<|think|>...<|/think|>` blocks (Gemma 4)
+      3. Orphan reasoning openers with no close (truncated chain-of-thought)
+      4. Chat-template tokens at the start ([INST], <|im_start|>, <s>, ...)
+      5. Stray leading brackets/braces/parens
     """
+    # 1+2. Strip well-formed thinking blocks (including nested text, across newlines)
+    text = re.sub(
+        r"<think\b[^>]*>.*?</think>|<\|think\|>.*?<\|/think\|>",
+        "",
+        text,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+    # 3. If reasoning opener appears with no close (model ran out of tokens mid-thought),
+    #    drop everything from the opener onward — whatever follows is likely incoherent.
+    text = re.sub(
+        r"<think\b[^>]*>.*|<\|think\|>.*",
+        "",
+        text,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
     text = text.strip()
-    # Strip common chat-template tokens (Mistral [INST], Llama <|...|>, ChatML, etc.)
+    # 4. Strip common chat-template tokens (Mistral [INST], Llama <|...|>, ChatML, etc.)
     text = re.sub(r"^(\[/?INST\]|<\|[^|]+\|>|<s>|</s>)\s*", "", text)
-    # Strip stray leading bracket/brace/paren fragments left over from template scaffolding.
+    # 5. Strip stray leading bracket/brace/paren fragments left over from template scaffolding.
     text = re.sub(r"^[\]\}\)]+\s*", "", text)
     return text.strip()
 

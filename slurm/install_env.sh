@@ -46,13 +46,6 @@ uv pip install --upgrade pip setuptools wheel cmake ninja
 echo "Installing core benchmark dependencies..."
 uv sync
 
-# --- Install PyTorch
-uv add "torch>=2.10.0"
-
-# --- Install vLLM
-uv add "opencv-python-headless>=4.13.0"
-uv add --index pypi=https://pypi.org/simple vllm==0.19.0 --extra-index-url https://wheels.vllm.ai/0.19.0/
-
 # --- Verify installation ---
 echo "Verifying installation..."
 python -c "import openai; import torch; import datasets; import vllm; print(f'All imports OK. torch={torch.__version__}, vllm={vllm.__version__}')"

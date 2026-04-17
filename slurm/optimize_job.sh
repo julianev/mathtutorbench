@@ -38,6 +38,14 @@ PROMPT_MAX_MODEL_LEN="${PROMPT_MAX_MODEL_LEN:-32768}"
 PROMPT_MAX_TOKENS="${PROMPT_MAX_TOKENS:-4096}"
 PROMPT_TENSOR_PARALLEL_SIZE="${PROMPT_TENSOR_PARALLEL_SIZE:-1}"
 
+# --- CUDA environment (flashinfer in vllm >=0.19 loads libcudart.so.12 via its
+#     own CUDA_LIB_PATH env var, defaulting to /usr/local/cuda/... which is
+#     permission-locked on this cluster) ---
+export CUDA_HOME="$HOME/cuda-12.8.1"
+export CUDA_LIB_PATH="$CUDA_HOME/targets/x86_64-linux/lib"
+export PATH="$CUDA_HOME/bin:$PATH"
+export LD_LIBRARY_PATH="$CUDA_HOME/lib64:${LD_LIBRARY_PATH:-}"
+
 # --- Project directory ---
 PROJECT_DIR="${SLURM_SUBMIT_DIR}"
 cd "$PROJECT_DIR"

@@ -25,10 +25,24 @@ dependencies = [
 
 [tool.uv]
 environments = ["sys_platform == 'linux'"]
+# Cluster nodes run glibc 2.28 (manylinux_2_28), but vllm 0.19+ only ships
+# manylinux_2_31 wheels. Declaring required-environments forces uv to install
+# the manylinux_2_31 wheel anyway — in practice it runs on glibc 2.28 because
+# the wheel's C extensions depend on CUDA runtime, not newer-libc symbols.
+# If `import vllm` crashes at runtime on the compute node, revert this and
+# pin vllm to an older version (pre-0.19) that ships manylinux_2_28 wheels.
+required-environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]
 
 [[tool.uv.index]]
 name = "pypi"
 url = "https://pypi.org/simple"
 
+# vllm hosts its own wheel index with prebuilt CUDA-matched wheels.
+# Required because pypi only has an sdist for some vllm releases, and building
+# from source inside uv's isolated build env fails (no ninja/numpy/CUDA toolchain).
+[[tool.uv.index]]
+name = "vllm-wheels"
+url = "https://wheels.vllm.ai/0.19.0/"
+
 [tool.uv.sources]
-vllm = { index = "pypi" }
+vllm = { index = "vllm-wheels" }
